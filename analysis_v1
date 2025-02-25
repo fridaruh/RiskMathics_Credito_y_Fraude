@@ -1,0 +1,84 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.tree import DecisionTreeClassifier
+from xgboost import XGBClassifier
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Cargar datos
+df = pd.read_csv("BankChurners.csv")
+
+# Eliminar columnas irrelevantes
+df.drop(columns=["CLIENTNUM", "Naive_Bayes_Classifier_Attrition_Flag_Card_Category_Contacts_Count_12_mon_Dependent_count_Education_Level_Months_Inactive_12_mon_1", 
+                  "Naive_Bayes_Classifier_Attrition_Flag_Card_Category_Contacts_Count_12_mon_Dependent_count_Education_Level_Months_Inactive_12_mon_2"], inplace=True)
+
+# Convertir la variable objetivo a numérica
+df["Attrition_Flag"] = df["Attrition_Flag"].apply(lambda x: 0 if x == "Existing Customer" else 1)
+
+# Análisis exploratorio
+print("\n--- Análisis Exploratorio ---")
+print(df.info())
+print(df.describe())
+
+# Distribución de la variable objetivo
+sns.countplot(x=df["Attrition_Flag"], palette="viridis")
+plt.title("Distribución de clientes cancelados vs. activos")
+plt.xlabel("Cancelación (0 = Activo, 1 = Cancelado)")
+plt.ylabel("Cantidad de clientes")
+plt.show()
+
+# Matriz de correlación
+plt.figure(figsize=(12,8))
+sns.heatmap(df.corr(), annot=True, fmt=".2f", cmap="coolwarm")
+plt.title("Matriz de correlación entre variables")
+plt.show()
+
+# Comparación de transacciones vs cancelación
+sns.boxplot(x=df["Attrition_Flag"], y=df["Total_Trans_Ct"], palette="muted")
+plt.title("Transacciones Totales por Grupo")
+plt.xlabel("Cancelación (0 = Activo, 1 = Cancelado)")
+plt.ylabel("Total de Transacciones")
+plt.show()
+
+# Codificar variables categóricas
+label_encoders = {}
+categorical_cols = ["Gender", "Education_Level", "Marital_Status", "Income_Category", "Card_Category"]
+for col in categorical_cols:
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col])
+    label_encoders[col] = le
+
+# Dividir datos en entrenamiento y prueba
+X = df.drop(columns=["Attrition_Flag"])
+y = df["Attrition_Flag"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+# Entrenar modelo de Árbol de Decisión
+dt_model = DecisionTreeClassifier(max_depth=5, random_state=42)
+dt_model.fit(X_train, y_train)
+
+y_pred_dt = dt_model.predict(X_test)
+print("\n--- Decision Tree Model ---")
+print(classification_report(y_test, y_pred_dt))
+print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred_dt))
+
+# Entrenar modelo XGBoost
+xgb_model = XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
+xgb_model.fit(X_train, y_train)
+
+y_pred_xgb = xgb_model.predict(X_test)
+print("\n--- XGBoost Model ---")
+print(classification_report(y_test, y_pred_xgb))
+print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred_xgb))
+
+# Visualizar importancia de las características
+feature_importances = pd.Series(xgb_model.feature_importances_, index=X.columns)
+feature_importances.nlargest(10).plot(kind='barh', title='Importancia de características (XGBoost)')
+plt.show()
+
+# Visualizar importancia de las características
+feature_importances = pd.Series(xgb_model.feature_importances_, index=X.columns)
+feature_importances.nlargest(10).plot(kind='barh', title='Importancia de características (XGBoost)')
+plt.show()
